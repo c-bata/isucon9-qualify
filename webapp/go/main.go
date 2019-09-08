@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -830,6 +831,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	var items []Item
 	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
+	var wg sync.WaitGroup
+	var apierror error
 	itemDetails := make([]ItemDetail, 0, len(itemIDs))
 	for _, item := range items {
 		seller, err := getUserSimpleByID(tx, item.SellerID)
@@ -885,6 +888,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		itemDetails = append(itemDetails, itemDetail)
+		currentIdx := len(itemDetails) - 1
 		if transactionEvidence.ID > 0 {
 			shipping := Shipping{}
 			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
@@ -900,22 +905,28 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
-			}, true)
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-				tx.Rollback()
-				return
-			}
+			itemDetails[currentIdx].TransactionEvidenceID = transactionEvidence.ID
+			itemDetails[currentIdx].TransactionEvidenceStatus = transactionEvidence.Status
 
-			itemDetail.TransactionEvidenceID = transactionEvidence.ID
-			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
-			itemDetail.ShippingStatus = ssr.Status
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
+					ReserveID: shipping.ReserveID,
+				}, true)
+				if err != nil && apierror == nil {
+					apierror = err
+				}
+				itemDetails[idx].ShippingStatus = ssr.Status
+			}(currentIdx)
 		}
-
-		itemDetails = append(itemDetails, itemDetail)
+	}
+	wg.Wait()
+	if apierror != nil {
+		tx.Rollback()
+		log.Print(err)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+		return
 	}
 	tx.Commit()
 

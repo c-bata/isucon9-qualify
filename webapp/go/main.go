@@ -374,7 +374,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		// 1st page
 		err := dbx.Select(&itemIDs,
 			// "SELECT id FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER `id` DESC LIMIT ?) AS t WHERE t.item = items.id AND `status` IN (?,?)",
+			"SELECT id FROM `items`,(SELECT item FROM `public_items` ORDER BY `id` DESC LIMIT ?) AS t WHERE t.item = items.id AND `status` IN (?,?)",
 			ItemsPerPage+1,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,

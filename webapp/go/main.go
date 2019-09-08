@@ -396,23 +396,23 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var bindItems [] struct {
-		ID         int64
-		SellerID   int64
-		Status     string
-		Name       string
-		Price      int
-		ImageName   string
-		CategoryID int
-		CreatedAt  int64
+		ID         int64 `db:"id"`
+		SellerID   int64 `db:"seller_id"`
+		Status     string `db:"status"`
+		Name       string `db:"name"`
+		Price      int `db:"price"`
+		ImageName   string `db:"image_name"`
+		CategoryID int `db:"category_id"`
+		CreatedAt  int64 `db:"created_at"`
 
-		SellerAccountName string
-		SellerNumSellItems int
+		SellerAccountName string `db:"account_name"`
+		SellerNumSellItems int `db:"num_sell_items"`
 
-		CategoryParentID int
-		CategoryName string
+		CategoryParentID int `db:"parent_id"`
+		CategoryName string `db:"category_name"`
 	}
 
-	err = dbx.Select(&bindItems, fmt.Sprintf("SELECT `items`.`id`, `items`.`seller_id`, `items`.`status`, items.name, items.price, items.image_name, items.category_id, items.created_at, seller.account_name, seller.num_sell_items, c.parent_id, c.category_name FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN categories AS c ON c.id = items.category_id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC", queryParts), args...)
+	err = dbx.Select(&bindItems, fmt.Sprintf("SELECT items.id, items.seller_id, items.status, items.name, items.price, items.image_name, items.category_id, items.created_at, seller.account_name, seller.num_sell_items, c.parent_id, c.category_name FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN categories AS c ON c.id = items.category_id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC", queryParts), args...)
 	if err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "failed to select users: " + err.Error())
 		return

@@ -2,7 +2,7 @@
 
 set -ex
 
-USER=${USER:-isucon}
+USER=${ISUCON_USER:-isucon}
 PEM=${PEM:-~/.ssh/isucon9.pem}
 IPADDR=${IPADDR:-47.91.19.40}
 

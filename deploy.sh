@@ -39,4 +39,6 @@ fi
 sudo systemctl restart isucari.golang.service
 sudo systemctl restart nginx.service
 sudo systemctl restart mysql.service
+
+echo "Success!"
 EOF

@@ -23,6 +23,7 @@ git branch
 git log --graph --all --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative | head -n 10
 
 # go build
+
 cd ./webapp/go/
 make all
 cd ~/isucari
@@ -42,10 +43,10 @@ sudo systemctl restart mysql.service
 echo "Success to restart!"
 
 # mysql setting
-echo "set global slow_query_log = ON;" | sudo mysql -u root
-echo "set global slow_query_log_file = '/var/log/mysql/mysql-slow.log';" | sudo mysql -u root
-echo "set global long_query_time = 0;" | sudo mysql -u root
-echo "Success slow_query_log set!"
+# echo "set global slow_query_log = ON;" | sudo mysql -u root
+# echo "set global slow_query_log_file = '/var/log/mysql/mysql-slow.log';" | sudo mysql -u root
+# echo "set global long_query_time = 0;" | sudo mysql -u root
+# echo "Success slow_query_log set!"
 
 # init private dir
 rm -rf /home/isucon/isucari/webapp/private

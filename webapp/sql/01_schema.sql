@@ -36,7 +36,7 @@ CREATE TABLE `items` (
 DROP TABLE IF EXISTS `public_items`;
 CREATE TABLE `public_items` (
   `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `item` bigint NOT NULL,
+  `item` bigint NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARACTER SET utf8;
 
 DROP TABLE IF EXISTS `transaction_evidences`;

@@ -46,6 +46,7 @@ echo "set global slow_query_log = ON;" | mysql -u isucari -pisucari
 echo "set global slow_query_log_file = '/var/log/mysql/mysql-slow.log';" | mysql -u isucari -pisucari
 echo "set global long_query_time = 0;" | mysql -u isucari -pisucari
 echo "Success slow_query_log set!"
+EOF
 
 curl -XPOST https://isucon9.catatsuy.org/initialize -H 'Content-Type: application/json' -d '{"payment_service_url":"https://payment.isucon9q.catatsuy.org","shipment_service_url":"https://shipment.isucon9q.catatsuy.org"}'
 

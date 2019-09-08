@@ -845,11 +845,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 		CategoryID    int       `json:"category_id" db:"category_id"`
 		ItemCreatedAt time.Time `json:"-" db:"created_at"`
-
-		TransactionEvidenceID     int64  `db:"id"`
-		TransactionEvidenceStatus string `db:"status"`
 	}
-	err = dbx.Select(&items, fmt.Sprintf(`SELECT items.id, items.seller_id, seller.account_name, seller.num_sell_items, items.buyer_id, buyer.account_name, buyer.num_sell_items, items.status, items.name, items.price, items.description, items.image_name, items.category_id, items.created_at, te.id, te.status FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN users AS buyer ON items.buyer_id = buyer.id LEFT JOIN transaction_evidences AS te ON te.item_id = items.id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC;`, queryParts), args...)
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT items.id, items.seller_id, seller.account_name, seller.num_sell_items, items.buyer_id, buyer.account_name, buyer.num_sell_items, items.status, items.name, items.price, items.description, items.image_name, items.category_id, items.created_at FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN users AS buyer ON items.buyer_id = buyer.id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC;`, queryParts), args...)
 
 	itemDetails := make([]ItemDetail, 0, len(itemIDs))
 	for _, item := range items {
@@ -886,16 +883,23 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: item.ItemCreatedAt.Unix(),
 		}
 
-		if item.TransactionEvidenceID > 0 {
-			shipping := Shipping{}
-			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", item.TransactionEvidenceID)
-			if err == sql.ErrNoRows {
-				outputErrorMsg(w, http.StatusNotFound, "shipping not found")
-				tx.Rollback()
-				return
-			}
+		var evidence struct {
+			ID                int64  `db:"id"`
+			Status            string `db:"status"`
+			ShippingReserveID string `db:"reserve_id"`
+		}
+		err = tx.Get(&evidence, "SELECT te.id, te.status, s.reserve_id FROM `transaction_evidences` AS te LEFT JOIN shippings AS s ON s.transaction_evidence_id = te.id WHERE te.item_id = ?", item.ID)
+		if err != nil && err != sql.ErrNoRows {
+			// It's able to ignore ErrNoRows
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+
+		if evidence.ID > 0 {
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
+				ReserveID: evidence.ShippingReserveID,
 			}, true)
 			if err != nil {
 				log.Print(err)
@@ -904,8 +908,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			itemDetail.TransactionEvidenceID = item.TransactionEvidenceID
-			itemDetail.TransactionEvidenceStatus = item.TransactionEvidenceStatus
+			itemDetail.TransactionEvidenceID = evidence.ID
+			itemDetail.TransactionEvidenceStatus = evidence.Status
 			itemDetail.ShippingStatus = ssr.Status
 		}
 

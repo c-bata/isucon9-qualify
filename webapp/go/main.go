@@ -533,6 +533,19 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	l := len(itemIDs)
+	args := make([]interface{}, l)
+	var queryParts string
+	for i := 0; i < l; i++ {
+		if i == 0 {
+			queryParts = "?"
+			args[0] = itemIDs[0]
+		} else {
+			queryParts += ", ?"
+			args[i] = itemIDs[i]
+		}
+	}
+
 	var bindItems []struct {
 		ID         int64     `db:"id"`
 		SellerID   int64     `db:"seller_id"`

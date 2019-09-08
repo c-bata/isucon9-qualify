@@ -515,7 +515,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
 			// "SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			"SELECT * FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
+			"SELECT `items`.`id` AS id, `items`.`seller_id` AS seller_id, `items`.`buyer_id` AS buyer_id, `items`.`status` AS status, `items`.`name` AS name, `items`.`price` AS price, `items`.`description` AS description, `items`.`image_name` AS image_name, `items`.`category_id` AS category_id, `items`.`created_at` AS created_at, `items`.`updated_at` AS updated_at FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
 			itemID,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
@@ -533,7 +533,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		// 1st page
 		inQuery, inArgs, err = sqlx.In(
 			// "SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY created_at DESC, id DESC LIMIT ?",
-			"SELECT * FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) LIMIT ?",
+			"SELECT `items`.`id` AS id, `items`.`seller_id` AS seller_id, `items`.`buyer_id` AS buyer_id, `items`.`status` AS status, `items`.`name` AS name, `items`.`price` AS price, `items`.`description` AS description, `items`.`image_name` AS image_name, `items`.`category_id` AS category_id, `items`.`created_at` AS created_at, `items`.`updated_at` AS updated_at FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,

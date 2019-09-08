@@ -42,9 +42,9 @@ sudo systemctl restart mysql.service
 echo "Success to restart!"
 
 # mysql setting
-echo "set global slow_query_log = ON;" | mysql -u isucari -pisucari
-echo "set global slow_query_log_file = '/var/log/mysql/mysql-slow.log';" | mysql -u isucari -pisucari
-echo "set global long_query_time = 0;" | mysql -u isucari -pisucari
+echo "set global slow_query_log = ON;" | sudo mysql -u root
+echo "set global slow_query_log_file = '/var/log/mysql/mysql-slow.log';" | sudo mysql -u root
+echo "set global long_query_time = 0;" | sudo mysql -u root
 echo "Success slow_query_log set!"
 EOF
 

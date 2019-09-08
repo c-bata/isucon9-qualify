@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/c-bata/measure v0.1.1
+	github.com/go-redis/redis v6.15.5+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gorilla/sessions v1.2.0
 	github.com/jmoiron/sqlx v1.2.0

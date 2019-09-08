@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-redis/redis"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -299,6 +301,24 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// redis initialize
+	var items []Item
+	err = dbx.Select(&items,
+		"SELECT * FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC",
+		ItemStatusOnSale,
+		ItemStatusSoldOut)
+	if err != nil {
+		log.Print(err)
+		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		return
+	}
+	for _, item := range items {
+		redisClient.ZAdd(newItemsKey(), redis.Z{
+			Score:  float64(item.CreatedAt.Unix()),
+			Member: item.ID,
+		})
+	}
+
 	res := resInitialize{
 		// キャンペーン実施時には還元率の設定を返す。詳しくはマニュアルを参照のこと。
 		Campaign: 0,
@@ -334,37 +354,42 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var itemIDs []int64
-	if itemID > 0 && createdAt > 0 {
-		// paging
-		err := dbx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			ItemStatusOnSale,
-			ItemStatusSoldOut,
-			time.Unix(createdAt, 0),
-			time.Unix(createdAt, 0),
-			itemID,
-			ItemsPerPage+1,
-		)
-		if err != nil {
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			return
-		}
-	} else {
-		// 1st page
-		err := dbx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			ItemStatusOnSale,
-			ItemStatusSoldOut,
-			ItemsPerPage+1,
-		)
-		if err != nil {
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			return
-		}
-	}
+	itemIDs := getNewItemsIDsFromRedis(redisGetNewItemsIDsParam{
+		LastID:        itemID,
+		LastCreatedAt: createdAt,
+		Size:          ItemsPerPage,
+	})
+	//var itemIDs []int64
+	//if itemID > 0 && createdAt > 0 {
+	//	// paging
+	//	err := dbx.Select(&itemIDs,
+	//		"SELECT id FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+	//		ItemStatusOnSale,
+	//		ItemStatusSoldOut,
+	//		time.Unix(createdAt, 0),
+	//		time.Unix(createdAt, 0),
+	//		itemID,
+	//		ItemsPerPage+1,
+	//	)
+	//	if err != nil {
+	//		log.Print(err)
+	//		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+	//		return
+	//	}
+	//} else {
+	//	// 1st page
+	//	err := dbx.Select(&itemIDs,
+	//		"SELECT id FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+	//		ItemStatusOnSale,
+	//		ItemStatusSoldOut,
+	//		ItemsPerPage+1,
+	//	)
+	//	if err != nil {
+	//		log.Print(err)
+	//		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+	//		return
+	//	}
+	//}
 	l := len(itemIDs)
 	args := make([]interface{}, l)
 	var queryParts string
@@ -1267,6 +1292,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		tx.Rollback()
 		return
 	}
+	delNewItems(targetItem.ID)
 
 	scr, err := APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
 		ToAddress:   buyer.Address,
@@ -1776,6 +1802,16 @@ func postComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var createdAt int64
+	err = tx.Get(&createdAt, "SELECT `created_at` FROM `items` WHERE `id` = ?", itemID)
+	if err != nil {
+		log.Print(err)
+		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		tx.Rollback()
+		return
+	}
+	addNewItems(itemID, createdAt)
+
 	tx.Commit()
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
@@ -1905,6 +1941,16 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var createdAt int64
+	err = tx.Get(&createdAt, "SELECT `created_at` FROM `items` WHERE `id` = ?", itemID)
+	if err != nil {
+		log.Print(err)
+		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		tx.Rollback()
+		return
+	}
+	addNewItems(itemID, createdAt)
+
 	now := time.Now()
 	_, err = tx.Exec("UPDATE `users` SET `num_sell_items`=?, `last_bump`=? WHERE `id`=?",
 		seller.NumSellItems+1,
@@ -2009,6 +2055,7 @@ func postBump(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
+	addNewItems(targetItem.ID, targetItem.CreatedAt.Unix())
 
 	_, err = tx.Exec("UPDATE `users` SET `last_bump`=? WHERE id=?",
 		now,

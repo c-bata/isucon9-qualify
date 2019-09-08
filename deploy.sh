@@ -43,7 +43,7 @@ sudo systemctl restart mysql.service
 echo "Success to restart!"
 EOF
 
-curl -XPOST http://${IPADDR}/initialize -H 'Content-Type: application/json' -d @initialize.json
+curl -XPOST https://isucon9.catatsuy.org/initialize -H 'Content-Type: application/json' -d '{"payment_service_url":"https://payment.isucon9q.catatsuy.org","shipment_service_url":"https://shipment.isucon9q.catatsuy.org"}'
 
 echo "Success to deploy!"
 echo "Done!"

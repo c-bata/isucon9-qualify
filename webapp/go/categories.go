@@ -23,13 +23,26 @@ func initCategories() error {
 	categoriesmu.Lock()
 	defer categoriesmu.Unlock()
 	for _, cid := range categoryList {
-		c, err := getCategoryByID(dbx, cid)
+		c, err := getCategoryByIDFromDB(dbx, cid)
 		if err != nil {
 			return err
 		}
 		categories[c.ID] = c
 	}
 	return nil
+}
+
+func getCategoryByIDFromDB(q sqlx.Queryer, categoryID int) (category Category, err error) {
+	defer measure.Start("get_category_by_id").Stop()
+	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+	if category.ParentID != 0 {
+		parentCategory, err := getCategoryByID(q, category.ParentID)
+		if err != nil {
+			return category, err
+		}
+		category.ParentCategoryName = parentCategory.CategoryName
+	}
+	return category, err
 }
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {

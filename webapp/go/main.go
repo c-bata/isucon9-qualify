@@ -393,7 +393,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 	var items []Item
 	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
-	itemSimples := []ItemSimple{}
+	itemSimples := make([]ItemSimple, 0, len(itemIDs))
 	for _, item := range items {
 		seller, err := getUserSimpleByID(dbx, item.SellerID)
 		if err != nil {
@@ -602,11 +602,11 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items := []Item{}
+	var itemIDs []int64
 	if itemID > 0 && createdAt > 0 {
 		// paging
-		err := dbx.Select(&items,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := dbx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -623,8 +623,8 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 1st page
-		err := dbx.Select(&items,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := dbx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -637,8 +637,22 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	l := len(itemIDs)
+	args := make([]interface{}, l)
+	var queryParts string
+	for i := 0; i < l; i++ {
+		if i == 0 {
+			queryParts = "?"
+			args[0] = itemIDs[0]
+		} else {
+			queryParts += ", ?"
+			args[i] = itemIDs[i]
+		}
+	}
+	var items []Item
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
-	itemSimples := []ItemSimple{}
+	itemSimples := make([]ItemSimple, 0, len(itemIDs))
 	for _, item := range items {
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
@@ -766,7 +780,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	var items []Item
 	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
-	itemDetails := []ItemDetail{}
+	itemDetails := make([]ItemDetail, 0, len(itemIDs))
 	for _, item := range items {
 		seller, err := getUserSimpleByID(tx, item.SellerID)
 		if err != nil {

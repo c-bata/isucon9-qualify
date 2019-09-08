@@ -352,7 +352,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		// paging
 		err := dbx.Select(&itemIDs,
 			// "SELECT id FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `id` DESC LIMIT ?",
-			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC LIMIT ?) AS t WHERE t.item == items.id AND `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `id` DESC LIMIT ?",
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC LIMIT ?) AS t WHERE t.item == items.id AND `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?))",
 			ItemsPerPage+1,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,

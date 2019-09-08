@@ -407,7 +407,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			CategoryName: item.CategoryName,
 			ParentID:     item.CategoryParentID,
 		}
-		err = getParentCategory(dbx, &category)
+		err = getParentCategory(&category)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
@@ -454,7 +454,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rootCategory, err := getCategoryByID(dbx, rootCategoryID)
+	rootCategory, err := getCategoryByID(rootCategoryID)
 	if err != nil || rootCategory.ParentID != 0 {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
@@ -575,7 +575,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 			CategoryName: item.CategoryName,
 			ParentID:     item.CategoryParentID,
 		}
-		err = getParentCategory(dbx, &category)
+		err = getParentCategory(&category)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
@@ -704,7 +704,7 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 
 	itemSimples := make([]ItemSimple, 0, len(itemIDs))
 	for _, item := range items {
-		category, err := getCategoryByID(dbx, item.CategoryID)
+		category, err := getCategoryByID(item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
@@ -827,30 +827,49 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			args[i] = itemIDs[i]
 		}
 	}
-	var items []Item
-	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
+	var items []struct {
+		ID                 int64  `json:"id" db:"id"`
+		SellerID           int64  `json:"seller_id" db:"seller_id"`
+		SellerAccountName  string `json:"account_name" db:"account_name"`
+		SellerNumSellItems int    `json:"num_sell_items" db:"num_sell_items"`
+
+		BuyerID           int64  `json:"buyer_id" db:"buyer_id"`
+		BuyerAccountName  string `json:"account_name" db:"account_name"`
+		BuyerNumSellItems int    `json:"num_sell_items" db:"num_sell_items"`
+
+		Status      string `json:"status" db:"status"`
+		Name        string `json:"name" db:"name"`
+		Price       int    `json:"price" db:"price"`
+		Description string `json:"description" db:"description"`
+		ImageName   string `json:"image_name" db:"image_name"`
+
+		CategoryID    int       `json:"category_id" db:"category_id"`
+		ItemCreatedAt time.Time `json:"-" db:"created_at"`
+	}
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT items.id, items.seller_id, seller.account_name, seller.num_sell_items, items.buyer_id, buyer.account_name, buyer.num_sell_items, items.status, items.name, items.price, items.description, items.image_name, items.category_id, items.created_at FROM items INNER JOIN users AS seller ON items.seller_id = seller.id LEFT JOIN users AS buyer ON items.buyer_id = buyer.id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC;`, queryParts), args...)
 
 	itemDetails := make([]ItemDetail, 0, len(itemIDs))
 	for _, item := range items {
-		seller, err := getUserSimpleByID(tx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			tx.Rollback()
-			return
-		}
-		category, err := getCategoryByID(tx, item.CategoryID)
+		category, err := getCategoryByID(item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			tx.Rollback()
 			return
 		}
 
 		itemDetail := ItemDetail{
 			ID:       item.ID,
 			SellerID: item.SellerID,
-			Seller:   &seller,
-			// BuyerID
-			// Buyer
+			Seller: &UserSimple{
+				ID:           item.SellerID,
+				AccountName:  item.SellerAccountName,
+				NumSellItems: item.SellerNumSellItems,
+			},
+			BuyerID: item.BuyerID,
+			Buyer: &UserSimple{
+				ID:           item.BuyerID,
+				AccountName:  item.BuyerAccountName,
+				NumSellItems: item.BuyerNumSellItems,
+			},
 			Status:      item.Status,
 			Name:        item.Name,
 			Price:       item.Price,
@@ -861,7 +880,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			// TransactionEvidenceStatus
 			// ShippingStatus
 			Category:  &category,
-			CreatedAt: item.CreatedAt.Unix(),
+			CreatedAt: item.ItemCreatedAt.Unix(),
 		}
 
 		if item.BuyerID != 0 {
@@ -962,7 +981,7 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := getCategoryByID(dbx, item.CategoryID)
+	category, err := getCategoryByID(item.CategoryID)
 	if err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "category not found")
 		return
@@ -1256,12 +1275,11 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := getCategoryByID(tx, targetItem.CategoryID)
+	category, err := getCategoryByID(targetItem.CategoryID)
 	if err != nil {
 		log.Print(err)
 
 		outputErrorMsg(w, http.StatusInternalServerError, "category id error")
-		tx.Rollback()
 		return
 	}
 
@@ -1865,7 +1883,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	category, err := getCategoryByID(dbx, categoryID)
+	category, err := getCategoryByID(categoryID)
 	if err != nil || category.ParentID == 0 {
 		log.Print(categoryID, category)
 		outputErrorMsg(w, http.StatusBadRequest, "Incorrect category ID")

@@ -120,6 +120,10 @@ func main() {
 	}
 	defer dbx.Close()
 
+	dbx.SetMaxOpenConns(16)
+	dbx.SetMaxIdleConns(24)
+	dbx.SetConnMaxLifetime(24 * time.Second)
+
 	mux := goji.NewMux()
 
 	// API

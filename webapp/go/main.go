@@ -1157,13 +1157,16 @@ func getQRCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(shipping.ImgBinary) == 0 {
+	img, err := ioutil.ReadFile(fmt.Sprintf("../private/qrcode/%d", shipping.TransactionEvidenceID))
+	if err != nil {
+		log.Print(err)
+
 		outputErrorMsg(w, http.StatusInternalServerError, "empty qrcode image")
 		return
 	}
 
 	w.Header().Set("Content-Type", "image/png")
-	w.Write(shipping.ImgBinary)
+	w.Write(img)
 }
 
 func postBuy(w http.ResponseWriter, r *http.Request) {
@@ -1465,9 +1468,8 @@ func postShip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = tx.Exec("UPDATE `shippings` SET `status` = ?, `img_binary` = ?, `updated_at` = ? WHERE `transaction_evidence_id` = ?",
+	_, err = tx.Exec("UPDATE `shippings` SET `status` = ?, `updated_at` = ? WHERE `transaction_evidence_id` = ?",
 		ShippingsStatusWaitPickup,
-		img,
 		time.Now(),
 		transactionEvidence.ID,
 	)
@@ -1475,6 +1477,15 @@ func postShip(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		tx.Rollback()
+		return
+	}
+
+	err = ioutil.WriteFile(fmt.Sprintf("../private/qrcode/%d", shipping.TransactionEvidenceID), img, 0644)
+	if err != nil {
+		log.Print(err)
+
+		outputErrorMsg(w, http.StatusInternalServerError, "qrcode save error")
 		tx.Rollback()
 		return
 	}

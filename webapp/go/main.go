@@ -373,10 +373,11 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		err := dbx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// "SELECT id FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER `id` DESC LIMIT ?) AS t WHERE t.item = items.id AND `status` IN (?,?)",
+			ItemsPerPage+1,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
-			ItemsPerPage+1,
 		)
 		if err != nil {
 			log.Print(err)
@@ -513,14 +514,15 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			ItemStatusOnSale,
-			ItemStatusSoldOut,
-			categoryIDs,
+			// "SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT * FROM `items`,	(SELECT item FROM `public_items` WHERE (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY id DESC LIMIT ?) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?)",
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
 			itemID,
 			ItemsPerPage+1,
+			ItemStatusOnSale,
+			ItemStatusSoldOut,
+			categoryIDs,
 		)
 		if err != nil {
 			log.Print(err)
@@ -530,7 +532,8 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		inQuery, inArgs, err = sqlx.In(
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY created_at DESC, id DESC LIMIT ?",
+			// "SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) ORDER BY created_at DESC, id DESC LIMIT ?",
+			"SELECT * FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC LIMIT ?) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?)",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
@@ -636,15 +639,16 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		err := dbx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			userSimple.ID,
-			ItemStatusOnSale,
-			ItemStatusTrading,
-			ItemStatusSoldOut,
+			// "SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` WHERE (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY id DESC LIMIT ?) AS t WHERE t.item = items.id AND `seller_id` = ? AND `status` IN (?,?,?)",
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
 			itemID,
 			ItemsPerPage+1,
+			userSimple.ID,
+			ItemStatusOnSale,
+			ItemStatusTrading,
+			ItemStatusSoldOut,
 		)
 		if err != nil {
 			log.Print(err)
@@ -654,12 +658,13 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		err := dbx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// "SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC LIMIT ?) AS t WHERE t.item = items.id AND `seller_id` = ? AND `status` IN (?,?,?)",
+			ItemsPerPage+1,
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
 			ItemStatusSoldOut,
-			ItemsPerPage+1,
 		)
 		if err != nil {
 			log.Print(err)
@@ -755,7 +760,12 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		err := tx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// "SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` WHERE (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY id DESC LIMIT ?) AS t WHERE t.item = items.id AND (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?)",
+			time.Unix(createdAt, 0),
+			time.Unix(createdAt, 0),
+			itemID,
+			TransactionsPerPage+1,
 			user.ID,
 			user.ID,
 			ItemStatusOnSale,
@@ -763,10 +773,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			ItemStatusSoldOut,
 			ItemStatusCancel,
 			ItemStatusStop,
-			time.Unix(createdAt, 0),
-			time.Unix(createdAt, 0),
-			itemID,
-			TransactionsPerPage+1,
 		)
 		if err != nil {
 			log.Print(err)
@@ -777,7 +783,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		err := tx.Select(&itemIDs,
-			"SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// "SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC LIMIT ?) AS t WHERE t.item = items.id AND (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?)",
+			TransactionsPerPage+1,
 			user.ID,
 			user.ID,
 			ItemStatusOnSale,
@@ -785,7 +793,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			ItemStatusSoldOut,
 			ItemStatusCancel,
 			ItemStatusStop,
-			TransactionsPerPage+1,
 		)
 		if err != nil {
 			log.Print(err)

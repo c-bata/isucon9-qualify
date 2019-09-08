@@ -701,7 +701,7 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func getTransactions(w http.ResponseWriter, r *http.Request) {
-	defer measure.Start("post_transactions").Stop()
+	defer measure.Start("get_transactions").Stop()
 
 	user, errCode, errMsg := getUser(r)
 	if errMsg != "" {

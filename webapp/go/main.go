@@ -222,26 +222,6 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	return userSimple, err
 }
 
-func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
-	defer measure.Start("get_category_by_id").Stop()
-	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
-	if category.ParentID != 0 {
-		err := getParentCategory(q, &category)
-		if err != nil {
-			return category, err
-		}
-	}
-	return category, err
-}
-
-func getParentCategory(q sqlx.Queryer, base *Category) error {
-	defer measure.Start("get_parent_category").Stop()
-	if base.ParentID == 0 {
-		return nil
-	}
-	return sqlx.Get(q, &base.ParentCategoryName, "SELECT category_name FROM `categories` WHERE `id` = ?", base.ParentID)
-}
-
 func getConfigByName(name string) (string, error) {
 	defer measure.Start("get_config_by_name").Stop()
 	config := Config{}
@@ -316,6 +296,13 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Print(err)
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		return
+	}
+
+	err = initCategories()
+	if err != nil {
+		log.Print(err)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to init categories")
 		return
 	}
 

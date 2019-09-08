@@ -347,11 +347,11 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items := []Item{}
+	var itemIDs []int64
 	if itemID > 0 && createdAt > 0 {
 		// paging
-		err := dbx.Select(&items,
-			"SELECT * FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := dbx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			time.Unix(createdAt, 0),
@@ -366,7 +366,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 1st page
-		err := dbx.Select(&items,
+		err := dbx.Select(&itemIDs,
 			"SELECT * FROM `items` WHERE `status` IN (?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
@@ -378,6 +378,20 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	l := len(itemIDs)
+	args := make([]interface{}, l)
+	var queryParts string
+	for i := 0; i < l; i++ {
+		if i == 0 {
+			queryParts = "?"
+			args[0] = itemIDs[0]
+		} else {
+			queryParts += ", ?"
+			args[i] = itemIDs[i]
+		}
+	}
+	var items []Item
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s)`, queryParts), args...)
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {

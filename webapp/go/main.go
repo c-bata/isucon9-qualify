@@ -1888,7 +1888,8 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := tx.Exec("INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	now := time.Now()
+	result, err := tx.Exec("INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		seller.ID,
 		ItemStatusOnSale,
 		name,
@@ -1896,6 +1897,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		description,
 		imgName,
 		category.ID,
+		now,
 	)
 	if err != nil {
 		log.Print(err)
@@ -1911,8 +1913,11 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
+	result, err = tx.Exec("INSERT INTO `public_items` (`item`, `created_at`) VALUES (?, ?)",
+		itemID,
+		now,
+	)
 
-	now := time.Now()
 	_, err = tx.Exec("UPDATE `users` SET `num_sell_items`=?, `last_bump`=? WHERE `id`=?",
 		seller.NumSellItems+1,
 		now,

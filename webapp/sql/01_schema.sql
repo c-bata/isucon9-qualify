@@ -33,6 +33,13 @@ CREATE TABLE `items` (
   INDEX idx_category_id (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4;
 
+DROP TABLE IF EXISTS `public_items`;
+CREATE TABLE `public_items` (
+  `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `item` bigint NOT NULL,
+  `created_at` datetime NOT NULL
+) ENGINE=MyISAM DEFAULT CHARACTER SET utf8;
+
 DROP TABLE IF EXISTS `transaction_evidences`;
 CREATE TABLE `transaction_evidences` (
   `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,

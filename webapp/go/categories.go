@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/c-bata/measure"
-	"github.com/jmoiron/sqlx"
 )
 
 var (
@@ -55,7 +54,7 @@ var (
 	}
 )
 
-func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
+func getCategoryByID(categoryID int) (category Category, err error) {
 	defer measure.Start("get_category_by_id").Stop()
 
 	if c, ok := categories[categoryID]; ok {
@@ -64,7 +63,7 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 	return Category{}, errors.New("category is not found")
 }
 
-func getParentCategory(q sqlx.Queryer, base *Category) error {
+func getParentCategory(base *Category) error {
 	defer measure.Start("get_parent_category").Stop()
 
 	if c, ok := categories[base.ParentID]; ok {

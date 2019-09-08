@@ -396,8 +396,8 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var bindItems [] struct {
-		ID         int64
-		SellerID   int64
+		ID         int64 `json:"id"`
+		SellerID   int64 `json:"seller_id"`
 		Status     string
 		Name       string
 		Price      int

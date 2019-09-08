@@ -1802,7 +1802,7 @@ func postComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var createdAt int64
+	var createdAt time.Time
 	err = tx.Get(&createdAt, "SELECT `created_at` FROM `items` WHERE `id` = ?", itemID)
 	if err != nil {
 		log.Print(err)
@@ -1810,7 +1810,7 @@ func postComplete(w http.ResponseWriter, r *http.Request) {
 		tx.Rollback()
 		return
 	}
-	addNewItems(itemID, createdAt)
+	addNewItems(itemID, createdAt.Unix())
 
 	tx.Commit()
 
@@ -1941,7 +1941,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var createdAt int64
+	var createdAt time.Time
 	err = tx.Get(&createdAt, "SELECT `created_at` FROM `items` WHERE `id` = ?", itemID)
 	if err != nil {
 		log.Print(err)
@@ -1949,7 +1949,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		tx.Rollback()
 		return
 	}
-	addNewItems(itemID, createdAt)
+	addNewItems(itemID, createdAt.Unix())
 
 	now := time.Now()
 	_, err = tx.Exec("UPDATE `users` SET `num_sell_items`=?, `last_bump`=? WHERE `id`=?",

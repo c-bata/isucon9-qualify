@@ -358,11 +358,11 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		err := dbx.Select(&itemIDs,
 			// "SELECT id FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
-			itemID,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
+			itemID,
 			ItemsPerPage+1,
 		)
 		if err != nil {
@@ -516,12 +516,12 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		inQuery, inArgs, err = sqlx.In(
 			// "SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			"SELECT `items`.`id` AS id, `items`.`seller_id` AS seller_id, `items`.`buyer_id` AS buyer_id, `items`.`status` AS status, `items`.`name` AS name, `items`.`price` AS price, `items`.`description` AS description, `items`.`image_name` AS image_name, `items`.`category_id` AS category_id, `items`.`created_at` AS created_at, `items`.`updated_at` AS updated_at FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
-			itemID,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
+			itemID,
 			ItemsPerPage+1,
 		)
 		if err != nil {
@@ -641,13 +641,13 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 		err := dbx.Select(&itemIDs,
 			// "SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
-			itemID,
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
 			ItemStatusSoldOut,
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
+			itemID,
 			ItemsPerPage+1,
 		)
 		if err != nil {

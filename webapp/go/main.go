@@ -706,11 +706,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tx := dbx.MustBegin()
 	var itemIDs []int64
 	if itemID > 0 && createdAt > 0 {
 		// paging
-		err := tx.Select(&itemIDs,
+		err := dbx.Select(&itemIDs,
 			"SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			user.ID,
@@ -727,12 +726,12 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Print(err)
 			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
+			//tx.Rollback()
 			return
 		}
 	} else {
 		// 1st page
-		err := tx.Select(&itemIDs,
+		err := dbx.Select(&itemIDs,
 			"SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			user.ID,
@@ -746,7 +745,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Print(err)
 			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
+			//tx.Rollback()
 			return
 		}
 	}
@@ -766,6 +765,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	var items []Item
 	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
+	tx := dbx.MustBegin()
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
 		seller, err := getUserSimpleByID(tx, item.SellerID)

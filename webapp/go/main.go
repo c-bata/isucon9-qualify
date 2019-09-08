@@ -237,7 +237,7 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 
 func getParentCategory(q sqlx.Queryer, base *Category) error {
 	defer measure.Start("get_parent_category").Stop()
-	return sqlx.Get(q, &base.ParentCategoryName, "SELECT name FROM `categories` WHERE `id` = ?", base.ParentID)
+	return sqlx.Get(q, &base.ParentCategoryName, "SELECT category_name FROM `categories` WHERE `id` = ?", base.ParentID)
 }
 
 func getConfigByName(name string) (string, error) {

@@ -57,6 +57,10 @@ regexp = '/[0-9]+\s'
 replace = '/<num> '
 
 [[replace]]
+regexp = '/[0-9]+.json'
+replace = '/<num>.json'
+
+[[replace]]
 regexp = '=[0-9]+&'
 replace = '=<num>&'
 

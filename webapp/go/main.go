@@ -357,12 +357,12 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		// paging
 		err := dbx.Select(&itemIDs,
 			// "SELECT id FROM `items` WHERE `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			"SELECT id FROM `items`, (SELECT item FROM `public_items` WHERE (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) LIMIT ?",
-			time.Unix(createdAt, 0),
-			time.Unix(createdAt, 0),
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
 			itemID,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
+			time.Unix(createdAt, 0),
+			time.Unix(createdAt, 0),
 			ItemsPerPage+1,
 		)
 		if err != nil {
@@ -515,13 +515,13 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
 			// "SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			"SELECT * FROM `items`,	(SELECT item FROM `public_items` WHERE (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) LIMIT ?",
-			time.Unix(createdAt, 0),
-			time.Unix(createdAt, 0),
+			"SELECT * FROM `items`,	(SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
 			itemID,
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
+			time.Unix(createdAt, 0),
+			time.Unix(createdAt, 0),
 			ItemsPerPage+1,
 		)
 		if err != nil {
@@ -640,14 +640,14 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 		// paging
 		err := dbx.Select(&itemIDs,
 			// "SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			"SELECT id FROM `items`, (SELECT item FROM `public_items` WHERE (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY id DESC) AS t WHERE t.item = items.id AND `seller_id` = ? AND `status` IN (?,?,?) LIMIT ?",
-			time.Unix(createdAt, 0),
-			time.Unix(createdAt, 0),
+			"SELECT id FROM `items`, (SELECT item FROM `public_items` ORDER BY id DESC) AS t WHERE t.item = items.id AND `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) LIMIT ?",
 			itemID,
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
 			ItemStatusSoldOut,
+			time.Unix(createdAt, 0),
+			time.Unix(createdAt, 0),
 			ItemsPerPage+1,
 		)
 		if err != nil {
@@ -1896,8 +1896,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
-	result, err := tx.Exec("INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+	result, err := tx.Exec("INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		seller.ID,
 		ItemStatusOnSale,
 		name,
@@ -1905,7 +1904,6 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		description,
 		imgName,
 		category.ID,
-		now,
 	)
 	if err != nil {
 		log.Print(err)
@@ -1921,11 +1919,17 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
-	result, err = tx.Exec("INSERT INTO `public_items` (`item`, `created_at`) VALUES (?, ?)",
+	result, err = tx.Exec("INSERT INTO `public_items` (`item`) VALUES (?)",
 		itemID,
-		now,
 	)
+	if err != nil {
+		log.Print(err)
 
+		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		return
+	}
+
+	now := time.Now()
 	_, err = tx.Exec("UPDATE `users` SET `num_sell_items`=?, `last_bump`=? WHERE `id`=?",
 		seller.NumSellItems+1,
 		now,

@@ -299,13 +299,6 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = initCategories()
-	if err != nil {
-		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "failed to init categories")
-		return
-	}
-
 	res := resInitialize{
 		// キャンペーン実施時には還元率の設定を返す。詳しくはマニュアルを参照のこと。
 		Campaign: 0,

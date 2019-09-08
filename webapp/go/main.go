@@ -131,6 +131,12 @@ func main() {
 	defer dbx.Close()
 
 	mux := goji.NewMux()
+	mux.Use(func(inner http.Handler) http.Handler {
+		mw := func(w http.ResponseWriter, r *http.Request) {
+			inner.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(mw)
+	})
 
 	// API
 	mux.HandleFunc(pat.Post("/initialize"), postInitialize)

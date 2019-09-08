@@ -686,12 +686,38 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 			args[i] = itemIDs[i]
 		}
 	}
-	var items []Item
-	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
+	var itemIDs []int64
+	err = dbx.Select(&itemIDs, fmt.Sprintf(`SELECT id FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
+
+	var bindItems []struct {
+		ID         int64     `db:"id"`
+		SellerID   int64     `db:"seller_id"`
+		Status     string    `db:"status"`
+		Name       string    `db:"name"`
+		Price      int       `db:"price"`
+		ImageName  string    `db:"image_name"`
+		CategoryID int       `db:"category_id"`
+		CreatedAt  time.Time `db:"created_at"`
+
+		CategoryParentID int    `db:"parent_id"`
+		CategoryName     string `db:"category_name"`
+	}
+
+	err = dbx.Select(&bindItems, fmt.Sprintf("SELECT items.id, items.seller_id, items.status, items.name, items.price, items.image_name, items.category_id, items.created_at, c.parent_id, c.category_name FROM items INNER JOIN categories AS c ON c.id = items.category_id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC", queryParts), args...)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "failed to select items: "+err.Error())
+		return
+	}
 
 	itemSimples := make([]ItemSimple, 0, len(itemIDs))
-	for _, item := range items {
-		category, err := getCategoryByID(dbx, item.CategoryID)
+	for _, item := range bindItems {
+		category := Category{
+			ID:                 item.CategoryID,
+			ParentID:           item.CategoryParentID,
+			CategoryName:       item.CategoryName,
+			ParentCategoryName: "",
+		}
+		err = getParentCategory(dbx, &category)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return

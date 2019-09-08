@@ -40,5 +40,11 @@ sudo systemctl restart isucari.golang.service
 sudo systemctl restart nginx.service
 sudo systemctl restart mysql.service
 
-echo "Success!"
+echo "Success to restart!"
 EOF
+
+curl -XPOST http://${IPADDR}/initialize -H 'Content-Type: application/json' -d @initialize.json
+
+echo "Success to deploy!"
+echo "Done!"
+

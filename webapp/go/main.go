@@ -848,10 +848,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 		TransactionEvidenceID     int64  `db:"id"`
 		TransactionEvidenceStatus string `db:"status"`
-
-		ShippingReserveID string `db:"reserve_id"`
 	}
-	err = dbx.Select(&items, fmt.Sprintf(`SELECT items.id, items.seller_id, seller.account_name, seller.num_sell_items, items.buyer_id, buyer.account_name, buyer.num_sell_items, items.status, items.name, items.price, items.description, items.image_name, items.category_id, items.created_at, te.id, te.status, s.reserve_id FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN users AS buyer ON items.buyer_id = buyer.id LEFT JOIN transaction_evidences AS te ON te.item_id = items.id LEFT JOIN shippings AS s ON s.transaction_evidence_id = te.id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC;`, queryParts), args...)
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT items.id, items.seller_id, seller.account_name, seller.num_sell_items, items.buyer_id, buyer.account_name, buyer.num_sell_items, items.status, items.name, items.price, items.description, items.image_name, items.category_id, items.created_at, te.id, te.status FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN users AS buyer ON items.buyer_id = buyer.id LEFT JOIN transaction_evidences AS te ON te.item_id = items.id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC;`, queryParts), args...)
 
 	itemDetails := make([]ItemDetail, 0, len(itemIDs))
 	for _, item := range items {
@@ -889,8 +887,15 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if item.TransactionEvidenceID > 0 {
+			shipping := Shipping{}
+			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", item.TransactionEvidenceID)
+			if err == sql.ErrNoRows {
+				outputErrorMsg(w, http.StatusNotFound, "shipping not found")
+				tx.Rollback()
+				return
+			}
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: item.ShippingReserveID,
+				ReserveID: shipping.ReserveID,
 			}, true)
 			if err != nil {
 				log.Print(err)

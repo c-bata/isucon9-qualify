@@ -235,6 +235,11 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 	return category, err
 }
 
+func getParentCategory(q sqlx.Queryer, base *Category) error {
+	defer measure.Start("get_parent_category").Stop()
+	return sqlx.Get(q, &base.ParentCategoryName, "SELECT category_name FROM `categories` WHERE `id` = ?", base.ParentID)
+}
+
 func getConfigByName(name string) (string, error) {
 	defer measure.Start("get_config_by_name").Stop()
 	config := Config{}
@@ -324,7 +329,7 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 }
 
 func getNewItems(w http.ResponseWriter, r *http.Request) {
-	defer measure.Start("post_new_items").Stop()
+	defer measure.Start("get_new_items").Stop()
 	query := r.URL.Query()
 	itemIDStr := query.Get("item_id")
 	var itemID int64
@@ -390,25 +395,49 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 			args[i] = itemIDs[i]
 		}
 	}
-	var items []Item
-	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
+	var bindItems []struct {
+		ID         int64     `db:"id"`
+		SellerID   int64     `db:"seller_id"`
+		Status     string    `db:"status"`
+		Name       string    `db:"name"`
+		Price      int       `db:"price"`
+		ImageName  string    `db:"image_name"`
+		CategoryID int       `db:"category_id"`
+		CreatedAt  time.Time `db:"created_at"`
 
-	itemSimples := []ItemSimple{}
-	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
+		SellerAccountName  string `db:"account_name"`
+		SellerNumSellItems int    `db:"num_sell_items"`
+
+		CategoryParentID int    `db:"parent_id"`
+		CategoryName     string `db:"category_name"`
+	}
+
+	err = dbx.Select(&bindItems, fmt.Sprintf("SELECT items.id, items.seller_id, items.status, items.name, items.price, items.image_name, items.category_id, items.created_at, seller.account_name, seller.num_sell_items, c.parent_id, c.category_name FROM items INNER JOIN users AS seller ON items.seller_id = seller.id INNER JOIN categories AS c ON c.id = items.category_id WHERE items.id IN (%s) ORDER BY items.created_at DESC, items.id DESC", queryParts), args...)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "failed to select users: "+err.Error())
+		return
+	}
+
+	itemSimples := make([]ItemSimple, 0, len(itemIDs))
+	for _, item := range bindItems {
+		category := Category{
+			ID:           item.CategoryID,
+			CategoryName: item.CategoryName,
+			ParentID:     item.CategoryParentID,
 		}
-		category, err := getCategoryByID(dbx, item.CategoryID)
+		err = getParentCategory(dbx, &category)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			return
 		}
 		itemSimples = append(itemSimples, ItemSimple{
-			ID:         item.ID,
-			SellerID:   item.SellerID,
-			Seller:     &seller,
+			ID:       item.ID,
+			SellerID: item.SellerID,
+			Seller: &UserSimple{
+				ID:           item.SellerID,
+				AccountName:  item.SellerAccountName,
+				NumSellItems: item.SellerNumSellItems,
+			},
 			Status:     item.Status,
 			Name:       item.Name,
 			Price:      item.Price,
@@ -602,11 +631,11 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items := []Item{}
+	var itemIDs []int64
 	if itemID > 0 && createdAt > 0 {
 		// paging
-		err := dbx.Select(&items,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := dbx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -623,8 +652,8 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 1st page
-		err := dbx.Select(&items,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := dbx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			userSimple.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -637,8 +666,22 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	l := len(itemIDs)
+	args := make([]interface{}, l)
+	var queryParts string
+	for i := 0; i < l; i++ {
+		if i == 0 {
+			queryParts = "?"
+			args[0] = itemIDs[0]
+		} else {
+			queryParts += ", ?"
+			args[i] = itemIDs[i]
+		}
+	}
+	var items []Item
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
-	itemSimples := []ItemSimple{}
+	itemSimples := make([]ItemSimple, 0, len(itemIDs))
 	for _, item := range items {
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
@@ -766,7 +809,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	var items []Item
 	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
-	itemDetails := []ItemDetail{}
+	itemDetails := make([]ItemDetail, 0, len(itemIDs))
 	for _, item := range items {
 		seller, err := getUserSimpleByID(tx, item.SellerID)
 		if err != nil {

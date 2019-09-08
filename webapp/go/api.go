@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/c-bata/measure"
 	"io/ioutil"
 	"net/http"
+	"time"
+
+	"github.com/c-bata/measure"
+	"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -50,6 +53,10 @@ type APIShipmentStatusRes struct {
 type APIShipmentStatusReq struct {
 	ReserveID string `json:"reserve_id"`
 }
+
+var (
+	shipmentStatusCache = cache.New(time.Minute, 2*time.Minute)
+)
 
 func APIPaymentToken(paymentURL string, param *APIPaymentServiceTokenReq) (*APIPaymentServiceTokenRes, error) {
 	defer measure.Start("api_payment_token").Stop()
@@ -148,11 +155,19 @@ func APIShipmentRequest(shipmentURL string, param *APIShipmentRequestReq) ([]byt
 		}
 		return nil, fmt.Errorf("status code: %d; body: %s", res.StatusCode, b)
 	}
+	shipmentStatusCache.Delete(param.ReserveID)
 
 	return ioutil.ReadAll(res.Body)
 }
 
-func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShipmentStatusRes, error) {
+func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq, useCache bool) (*APIShipmentStatusRes, error) {
+	if useCache {
+		ssrc, ok := shipmentStatusCache.Get(param.ReserveID)
+		if ok {
+			return ssrc.(*APIShipmentStatusRes), nil
+		}
+	}
+
 	defer measure.Start("api_shipment_status").Stop()
 	b, _ := json.Marshal(param)
 
@@ -183,6 +198,13 @@ func APIShipmentStatus(shipmentURL string, param *APIShipmentStatusReq) (*APIShi
 	err = json.NewDecoder(res.Body).Decode(&ssr)
 	if err != nil {
 		return nil, err
+	}
+
+	// shippingの時だけはshipment serviceでstatusが変化するため、キャッシュしない
+	if ssr.Status == "shipping" {
+		shipmentStatusCache.Delete(param.ReserveID)
+	} else {
+		shipmentStatusCache.Set(param.ReserveID, ssr, cache.DefaultExpiration)
 	}
 
 	return ssr, nil

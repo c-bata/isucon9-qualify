@@ -792,9 +792,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				tx.Rollback()
 				return
 			}
+
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: shipping.ReserveID,
-			})
+			}, true)
 			if err != nil {
 				log.Print(err)
 				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
@@ -1495,7 +1496,7 @@ func postShipDone(w http.ResponseWriter, r *http.Request) {
 
 	ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 		ReserveID: shipping.ReserveID,
-	})
+	}, false)
 	if err != nil {
 		log.Print(err)
 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
@@ -1635,7 +1636,7 @@ func postComplete(w http.ResponseWriter, r *http.Request) {
 
 	ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 		ReserveID: shipping.ReserveID,
-	})
+	}, false)
 	if err != nil {
 		log.Print(err)
 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")

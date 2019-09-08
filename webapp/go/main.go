@@ -26,6 +26,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/c-bata/measure"
+	"github.com/patrickmn/go-cache"
 )
 
 const (
@@ -68,6 +69,8 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
+
+	shippingStatusCache = cache.New(time.Second, 10*time.Second)
 )
 
 func init() {
@@ -792,14 +795,22 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				tx.Rollback()
 				return
 			}
-			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
-			})
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-				tx.Rollback()
-				return
+
+			var ssr *APIShipmentStatusRes
+			ssrc, ok := shippingStatusCache.Get(shipping.ReserveID)
+			if ok {
+				ssr = ssrc.(*APIShipmentStatusRes)
+			} else {
+				ssr, err = APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
+					ReserveID: shipping.ReserveID,
+				})
+				if err != nil {
+					log.Print(err)
+					outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+					tx.Rollback()
+					return
+				}
+				shippingStatusCache.Set(shipping.ReserveID, ssr, cache.DefaultExpiration)
 			}
 
 			itemDetail.TransactionEvidenceID = transactionEvidence.ID
@@ -1503,6 +1514,7 @@ func postShipDone(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	shippingStatusCache.Set(shipping.ReserveID, ssr, cache.DefaultExpiration)
 
 	if !(ssr.Status == ShippingsStatusShipping || ssr.Status == ShippingsStatusDone) {
 		outputErrorMsg(w, http.StatusForbidden, "shipment service側で配送中か配送完了になっていません")
@@ -1643,6 +1655,7 @@ func postComplete(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	shippingStatusCache.Set(shipping.ReserveID, ssr, cache.DefaultExpiration)
 
 	if !(ssr.Status == ShippingsStatusDone) {
 		outputErrorMsg(w, http.StatusBadRequest, "shipment service側で配送完了になっていません")

@@ -1844,7 +1844,10 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := tx.Exec("INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	var datetime = time.Now()
+	datetime.Format(time.RFC3339)
+
+	result, err := tx.Exec("INSERT INTO `items` (`seller_id`, `status`, `name`, `price`, `description`,`image_name`,`category_id`, `created_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		seller.ID,
 		ItemStatusOnSale,
 		name,
@@ -1852,6 +1855,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		description,
 		imgName,
 		category.ID,
+		datetime,
 	)
 	if err != nil {
 		log.Print(err)
@@ -1861,6 +1865,16 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	}
 
 	itemID, err := result.LastInsertId()
+	if err != nil {
+		log.Print(err)
+
+		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		return
+	}
+	result, err = tx.Exec("INSERT INTO `public_items` (`item`, `created_at`) VALUES (?, ?)",
+		itemID,
+		datetime,
+	)
 	if err != nil {
 		log.Print(err)
 

@@ -391,7 +391,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var items []Item
-	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s)`, queryParts), args...)
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
 	itemSimples := []ItemSimple{}
 	for _, item := range items {

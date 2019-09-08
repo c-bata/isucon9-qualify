@@ -226,17 +226,19 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 	defer measure.Start("get_category_by_id").Stop()
 	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
 	if category.ParentID != 0 {
-		parentCategory, err := getCategoryByID(q, category.ParentID)
+		err := getParentCategory(q, &category)
 		if err != nil {
 			return category, err
 		}
-		category.ParentCategoryName = parentCategory.CategoryName
 	}
 	return category, err
 }
 
 func getParentCategory(q sqlx.Queryer, base *Category) error {
 	defer measure.Start("get_parent_category").Stop()
+	if base.ParentID == 0 {
+		return nil
+	}
 	return sqlx.Get(q, &base.ParentCategoryName, "SELECT category_name FROM `categories` WHERE `id` = ?", base.ParentID)
 }
 

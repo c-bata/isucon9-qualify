@@ -23,9 +23,6 @@ import (
 	"goji.io/pat"
 	"golang.org/x/crypto/bcrypt"
 
-	_ "expvar"
-	_ "net/http/pprof"
-
 	"github.com/c-bata/measure"
 )
 
@@ -82,15 +79,7 @@ func init() {
 }
 
 func main() {
-	// measure csv
-	go func() {
-		log.Println(http.ListenAndServe("0.0.0.0:6070", &measure.Handler{}))
-	}()
-	// default servemux
-	go func() {
-		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
-	}()
-
+	measure.Disabled = true
 	host := os.Getenv("MYSQL_HOST")
 	if host == "" {
 		host = "127.0.0.1"

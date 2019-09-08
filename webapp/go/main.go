@@ -707,11 +707,11 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tx := dbx.MustBegin()
-	items := []Item{}
+	var itemIDs []int64
 	if itemID > 0 && createdAt > 0 {
 		// paging
-		err := tx.Select(&items,
-			"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := tx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			user.ID,
 			ItemStatusOnSale,
@@ -732,8 +732,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 1st page
-		err := tx.Select(&items,
-			"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		err := tx.Select(&itemIDs,
+			"SELECT id FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			user.ID,
 			ItemStatusOnSale,
@@ -750,6 +750,21 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	l := len(itemIDs)
+	args := make([]interface{}, l)
+	var queryParts string
+	for i := 0; i < l; i++ {
+		if i == 0 {
+			queryParts = "?"
+			args[0] = itemIDs[0]
+		} else {
+			queryParts += ", ?"
+			args[i] = itemIDs[i]
+		}
+	}
+	var items []Item
+	err = dbx.Select(&items, fmt.Sprintf(`SELECT * FROM items WHERE id IN (%s) ORDER BY created_at DESC, id DESC`, queryParts), args...)
 
 	itemDetails := []ItemDetail{}
 	for _, item := range items {

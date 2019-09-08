@@ -847,7 +847,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		CategoryID    int       `json:"category_id" db:"category_id"`
 		ItemCreatedAt time.Time `json:"-" db:"created_at"`
 
-		TransactionEvidenceID     int64  `db:"te_1id"`
+		TransactionEvidenceID     int64  `db:"te_id"`
 		TransactionEvidenceStatus string `db:"te_status"`
 
 		ShippingReserveID string `db:"reserve_id"`

@@ -40,5 +40,10 @@ sudo systemctl restart isucari.golang.service
 sudo systemctl restart nginx.service
 sudo systemctl restart mysql.service
 
+# mysql setting
+echo "set global slow_query_log = ON;" | mysql -u isucari -pisucari
+echo "set global slow_query_log_file = '/var/log/mysql/mysql-slow.log';" | mysql -u isucari -pisucari
+echo "set global long_query_time = 0;" | mysql -u isucari -pisucari
+
 echo "Success!"
 EOF
